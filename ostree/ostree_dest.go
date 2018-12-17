@@ -30,9 +30,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/vbatts/tar-split/tar/asm"
 	"github.com/vbatts/tar-split/tar/storage"
+	"github.com/coreos/pkg/dlopen"
 )
 
-// #cgo pkg-config: glib-2.0 gobject-2.0 ostree-1 libselinux
+// #cgo pkg-config: glib-2.0 gobject-2.0 ostree-1
 // #include <glib.h>
 // #include <glib-object.h>
 // #include <gio/gio.h>
@@ -41,6 +42,85 @@ import (
 // #include <gio/ginputstream.h>
 // #include <selinux/selinux.h>
 // #include <selinux/label.h>
+//
+// struct selabel_handle *
+//   my_selabel_open(
+//		void *function,
+//		unsigned int backend,
+//		const struct selinux_opt *opts,
+//		unsigned nopts)
+// {
+//		struct selabel_handle *(*ptr_selabel_open)(
+//			unsigned int,
+//			const struct selinux_opt *,
+//			unsigned);
+//		ptr_selabel_open = (struct selabel_handle *(*)(
+//				unsigned int,
+//				const struct selinux_opt *,
+//				unsigned))function;
+//		return ptr_selabel_open(backend, opts, nopts);
+// }
+//
+// void
+//   my_selabel_close(
+//		void *function,
+//		struct selabel_handle *handle)
+// {
+//		void (*ptr_selabel_close)(
+//			struct selabel_handle *);
+//		ptr_selabel_close = (void (*)(
+//				struct selabel_handle *))function;
+//		return ptr_selabel_close(handle);
+// }
+//
+// int
+//   my_selabel_lookup_raw(
+//		void *function,
+//		struct selabel_handle *handle,
+//		char **con,
+//		const char *key,
+//		int type)
+// {
+//		int (*ptr_selabel_lookup_raw)(
+//				struct selabel_handle *,
+//				char **,
+//				const char*,
+//				int);
+//		ptr_selabel_lookup_raw = (int (*)(
+//				struct selabel_handle *,
+//				char **,
+//				const char*,
+//				int))function;
+//		return ptr_selabel_lookup_raw(handle, con, key, type);
+// }
+//
+// int
+//   my_lsetfilecon_raw(
+//		void *function,
+//		const char *path,
+//		const char *con)
+// {
+//		int (*ptr_lsetfilecon_raw)(
+//				const char *,
+//				const char *);
+//		ptr_lsetfilecon_raw = (int (*)(
+//				const char *,
+//				const char *))function;
+//		return ptr_lsetfilecon_raw(path, con);
+// }
+//
+// void
+//   my_freecon(
+//		void *function,
+//		char *con)
+// {
+//		void (*ptr_freecon)(
+//				char *);
+//		ptr_freecon = (void (*)(
+//				char *))function;
+//		return ptr_freecon(con);
+// }
+//
 import "C"
 
 type blobToImport struct {
@@ -73,6 +153,8 @@ type ostreeImageDestination struct {
 	signaturesLen int
 	repo          *C.struct_OstreeRepo
 }
+
+var selinux_functions map[string]unsafe.Pointer
 
 // newImageDestination returns an ImageDestination for writing to an existing ostree.
 func newImageDestination(ref ostreeReference, tmpDirPath string) (types.ImageDestination, error) {
@@ -208,15 +290,17 @@ func fixFiles(selinuxHnd *C.struct_selabel_handle, root string, dir string, user
 			defer C.free(unsafe.Pointer(relPathC))
 			var context *C.char
 
-			res, err := C.selabel_lookup_raw(selinuxHnd, &context, relPathC, C.int(info.Mode()&os.ModePerm))
+			res, err := C.my_selabel_lookup_raw(selinux_functions['selabel_lookup_raw'],
+				selinuxHnd, &context, relPathC, C.int(info.Mode()&os.ModePerm))
 			if int(res) < 0 && err != syscall.ENOENT {
 				return errors.Wrapf(err, "cannot selabel_lookup_raw %s", relPath)
 			}
 			if int(res) == 0 {
-				defer C.freecon(context)
+				defer C.my_freecon(selinux_functions['freecon'], context)
 				fullpathC := C.CString(fullpath)
 				defer C.free(unsafe.Pointer(fullpathC))
-				res, err = C.lsetfilecon_raw(fullpathC, context)
+				res, err := C.my_lsetfilecon_raw(selinux_functions['lsetfilecon_raw'],
+					fullpathC, context)
 				if int(res) < 0 {
 					return errors.Wrapf(err, "cannot setfilecon_raw %s", fullpath)
 				}
@@ -432,13 +516,33 @@ func (d *ostreeImageDestination) Commit(ctx context.Context) error {
 
 	var selinuxHnd *C.struct_selabel_handle
 
-	if os.Getuid() == 0 && selinux.GetEnabled() {
-		selinuxHnd, err = C.selabel_open(C.SELABEL_CTX_FILE, nil, 0)
-		if selinuxHnd == nil {
-			return errors.Wrapf(err, "cannot open the SELinux DB")
-		}
+	// dlopen.GetHandle will fail if libselinux.so is not available
+	// following block will be completely jump over and
+	// selinuxHnd = nil (important in fixFiles)
+	// so the absence of SElinux will be simply ignored
+	libselinuxHnd, err := dlopen.GetHandle([]string{"libselinux.so"})
+	if err == nil {
+		defer libselinuxHnd.Close()
 
-		defer C.selabel_close(selinuxHnd)
+		if os.Getuid() == 0 && selinux.GetEnabled() {
+			selinux_function_names := []string{'selabel_open', 'selabel_close',
+				'selabel_lookup_raw', 'lsetfilecon_raw', 'freecon'}
+
+			for _, function := range selinux_function_names {
+				selinux_functions[function], err := libselinuxHnd.GetSymbolPointer(function)
+				if err != nil {
+					return fmt.Errorf(`couldn't get symbol %q: %v`, function, err)
+				}
+			}
+
+			selinuxHnd, err = C.my_selabel_open(selinux_functions['selabel_open'],
+				C.SELABEL_CTX_FILE, nil, 0)
+			if selinuxHnd == nil {
+				return errors.Wrapf(err, "cannot open the SELinux DB")
+			}
+
+			defer C.my_selabel_close(selinux_functions['selabel_close'], selinuxHnd)
+		}
 	}
 
 	checkLayer := func(hash string) error {

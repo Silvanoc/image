@@ -20,7 +20,7 @@ endif
 BUILDTAGS = btrfs_noversion libdm_no_deferred_remove $(PLATFORM_BUILD_TAG)
 BUILDFLAGS := -tags "$(BUILDTAGS)"
 
-PACKAGES := $(shell go list $(BUILDFLAGS) ./... | grep -v github.com/containers/image/vendor)
+PACKAGES := $(shell go list $(BUILDFLAGS) ./... | grep -v github.com/silvanoc/image/vendor)
 SOURCE_DIRS = $(shell echo $(PACKAGES) | awk 'BEGIN{FS="/"; RS=" "}{print $$4}' | uniq)
 
 # On macOS, (brew install gpgme) installs it within /usr/local, but /usr/local/include is not in the default search path.
@@ -97,7 +97,7 @@ lint:
 ifeq ($(TRAVIS),true)
 	git-validation -q -run DCO,short-subject,dangling-whitespace
 else
-	git fetch -q "https://github.com/containers/image.git" "refs/heads/master"
+	git fetch -q "https://github.com/silvanoc/image.git" "refs/heads/master"
 	upstream="$$(git rev-parse --verify FETCH_HEAD)" ; \
 		git-validation -q -run DCO,short-subject,dangling-whitespace -range $$upstream..HEAD
 endif

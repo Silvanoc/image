@@ -26,8 +26,6 @@ type mandatoryAccessControl struct {
 }
 
 func (m mandatoryAccessControl) Open() error {
-	var selinuxHnd *C.struct_selabel_handle
-
 	if os.Getuid() == 0 && selinux.GetEnabled() {
 		selinuxHnd, err := C.selabel_open(C.SELABEL_CTX_FILE, nil, 0)
 		if selinuxHnd == nil {

@@ -2,10 +2,10 @@ package ostree
 
 import "os"
 
-type mandatoryAccessControlStub struct{}
+type macStub struct{}
 
-func (m mandatoryAccessControlStub) Close() {}
+func (m macStub) Close() {}
 
-func (m mandatoryAccessControlStub) ChangeLabels(root string, fullpath string, fileMode os.FileMode) error {
+func (m macStub) ChangeLabels(root string, fullpath string, fileMode os.FileMode) error {
 	return nil
 }

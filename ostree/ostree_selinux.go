@@ -21,43 +21,32 @@ import (
 // #include <selinux/label.h>
 import "C"
 
-type mandatoryAccessControl struct {
+type mandatoryAccessControl interface {
+	Close()
+	ChangeLabels(root string, fullpath string, fileMode os.FileMode)
+}
+
+type macSelinux struct {
 	handler *C.struct_selabel_handle
 }
 
-# 
-
-func CreateMac() (*mandatoryAccessControlInterface, error) {}
+func CreateMac() (*mandatoryAccessControl, error) {}
 	if os.Getuid() == 0 && selinux.GetEnabled() {
 		selinuxHnd, err := C.selabel_open(C.SELABEL_CTX_FILE, nil, 0)
 		if selinuxHnd == nil {
 			return nil, errors.Wrapf(err, "cannot open the SELinux DB")
 		}
-		return &mandatoryAccessControl{selinuxHnd}, nil
+		return &macSelinux{selinuxHnd}, nil
 	}
 
-	return &mandatoryAccessControlStub{}, nil
+	return &macStub{}, nil
 }
 
-func (m mandatoryAccessControlStub) Close() {}
-
-func (m mandatoryAccessControlStub) ChangeLabels(root string, fullpath string, fileMode os.FileMode) error {
-	return nil
+func (m macSelinux) Close() {
+	C.selabel_close(m.handler)
 }
 
-# 
-
-func (m mandatoryAccessControl) Close() {
-	if m.handler != nil {
-		C.selabel_close(m.handler)
-	}
-}
-
-func (m mandatoryAccessControl) ChangeLabels(root string, fullpath string, fileMode os.FileMode) error {
-	if m.handler == nil {
-		return nil
-	}
-
+func (m macSelinux) ChangeLabels(root string, fullpath string, fileMode os.FileMode) error {
 	relPath, err := filepath.Rel(root, fullpath)
 	if err != nil {
 		return err

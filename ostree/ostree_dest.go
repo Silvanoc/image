@@ -21,7 +21,6 @@ import (
 	"github.com/containers/image/types"
 	"github.com/containers/storage/pkg/archive"
 	"github.com/klauspost/pgzip"
-	"github.com/opencontainers/go-digest"
 	"github.com/ostreedev/ostree-go/pkg/otbuiltin"
 	"github.com/pkg/errors"
 	"github.com/vbatts/tar-split/tar/asm"

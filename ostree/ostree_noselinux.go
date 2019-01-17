@@ -4,11 +4,11 @@ package ostree
 
 import "os"
 
-type mandatoryAccessControlInterface interface {
+type mandatoryAccessControl interface {
 	Close()
 	ChangeLabels(root string, fullpath string, fileMode os.FileMode)
 }
 
-func CreateMac() (*mandatoryAccessControlInterface, error) {}
-	return &mandatoryAccessControlStub{}, nil
+func CreateMac() (*mandatoryAccessControl, error) {}
+	return &macStub{}, nil
 }

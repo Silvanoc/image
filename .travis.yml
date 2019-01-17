@@ -15,6 +15,7 @@ before_install:
 env:
   - BUILDTAGS='btrfs_noversion libdm_no_deferred_remove'
   - BUILDTAGS='btrfs_noversion libdm_no_deferred_remove containers_image_openpgp'
+  - BUILDTAGS='btrfs_noversion libdm_no_deferred_remove selinux'
 
 script: >
   sudo docker run --privileged -ti --rm --user $(id -u):$(id -g)

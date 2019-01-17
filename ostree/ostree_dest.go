@@ -188,11 +188,9 @@ func fixFiles(mac *mandatoryAccessControl, root string, dir string, usermode boo
 			continue
 		}
 
-		if mac.handler != nil {
-			err = mac.ChangeLabels(root, fullpath, info.Mode())
-			if err != nil {
-				return err
-			}
+		err = mac.ChangeLabels(root, fullpath, info.Mode())
+		if err != nil {
+			return err
 		}
 
 		if info.IsDir() {

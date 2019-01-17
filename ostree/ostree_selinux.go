@@ -40,7 +40,7 @@ func (m mandatoryAccessControl) Close() {
 	C.selabel_close(m.handler)
 }
 
-func (m mandatoryAccessControl) checkPermissions(root string, fullpath string, fileMode os.FileMode) error {
+func (m mandatoryAccessControl) changeLabels(root string, fullpath string, fileMode os.FileMode) error {
 	relPath, err := filepath.Rel(root, fullpath)
 	if err != nil {
 		return err

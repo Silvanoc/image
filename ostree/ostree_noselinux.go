@@ -17,6 +17,6 @@ func (m mandatoryAccessControl) Open() error {
 
 func (m mandatoryAccessControl) Close() {}
 
-func (m mandatoryAccessControl) checkPermissions(root string, fullpath string, fileMode os.FileMode) error {
+func (m mandatoryAccessControl) changeLabels(root string, fullpath string, fileMode os.FileMode) error {
 	return nil
 }

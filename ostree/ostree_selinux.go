@@ -25,22 +25,39 @@ type mandatoryAccessControl struct {
 	handler *C.struct_selabel_handle
 }
 
-func (m mandatoryAccessControl) Open() error {
+# 
+
+func CreateMac() (*mandatoryAccessControlInterface, error) {}
 	if os.Getuid() == 0 && selinux.GetEnabled() {
 		selinuxHnd, err := C.selabel_open(C.SELABEL_CTX_FILE, nil, 0)
 		if selinuxHnd == nil {
-			return errors.Wrapf(err, "cannot open the SELinux DB")
+			return nil, errors.Wrapf(err, "cannot open the SELinux DB")
 		}
+		return &mandatoryAccessControl{selinuxHnd}, nil
 	}
-	m.handler = selinuxHnd
+
+	return &mandatoryAccessControlStub{}, nil
+}
+
+func (m mandatoryAccessControlStub) Close() {}
+
+func (m mandatoryAccessControlStub) ChangeLabels(root string, fullpath string, fileMode os.FileMode) error {
 	return nil
 }
 
+# 
+
 func (m mandatoryAccessControl) Close() {
-	C.selabel_close(m.handler)
+	if m.handler != nil {
+		C.selabel_close(m.handler)
+	}
 }
 
-func (m mandatoryAccessControl) changeLabels(root string, fullpath string, fileMode os.FileMode) error {
+func (m mandatoryAccessControl) ChangeLabels(root string, fullpath string, fileMode os.FileMode) error {
+	if m.handler == nil {
+		return nil
+	}
+
 	relPath, err := filepath.Rel(root, fullpath)
 	if err != nil {
 		return err

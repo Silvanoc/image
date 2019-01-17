@@ -189,7 +189,7 @@ func fixFiles(mac *mandatoryAccessControl, root string, dir string, usermode boo
 		}
 
 		if mac.handler != nil {
-			err = mac.changeLabels(root, fullpath, info.Mode())
+			err = mac.ChangeLabels(root, fullpath, info.Mode())
 			if err != nil {
 				return err
 			}
@@ -402,8 +402,7 @@ func (d *ostreeImageDestination) Commit(ctx context.Context) error {
 		return err
 	}
 
-	mac := new(mandatoryAccessControl)
-	err = mac.Open()
+	mac, err := CreateMac()
 	if err != nil {
 		return err
 	}

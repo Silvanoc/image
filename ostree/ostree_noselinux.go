@@ -2,21 +2,13 @@
 
 package ostree
 
-import (
-	"os"
-	"unsafe"
-)
+import "os"
 
-type mandatoryAccessControl struct {
-	handler *unsafe.Pointer
+type mandatoryAccessControlInterface interface {
+	Close()
+	ChangeLabels(root string, fullpath string, fileMode os.FileMode)
 }
 
-func (m mandatoryAccessControl) Open() error {
-	return nil
-}
-
-func (m mandatoryAccessControl) Close() {}
-
-func (m mandatoryAccessControl) changeLabels(root string, fullpath string, fileMode os.FileMode) error {
-	return nil
+func CreateMac() (*mandatoryAccessControlInterface, error) {}
+	return &mandatoryAccessControlStub{}, nil
 }
